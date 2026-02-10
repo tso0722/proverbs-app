@@ -289,7 +289,7 @@ function loadVerses() {
   for(let v in proverbs[chapter]){
     const d=document.createElement("div");
     d.className="verse";
-    d.textContent=`${v}절${proverbs[chapter][v]}`;
+    d.textContent=`${v} ${proverbs[chapter][v]}`;
     d.onclick=()=>{
       d.classList.toggle("selected");
       const key = `${chapter}:${v}`;
@@ -384,6 +384,7 @@ updateStats();
 </script>
 </body>
 </html>
+
 
 
 
