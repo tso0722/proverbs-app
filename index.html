@@ -360,7 +360,7 @@ async function pasteText() {
   textarea.value = before + "잠" + cleanText + after;
 
   // 선택 후 커서 위치
-  textarea.selectionStart = textarea.selectionEnd = start + cleanText.length;
+  textarea.selectionStart = textarea.selectionEnd = start + cleanText.length + \n + \n;
 
   saveUndo();
 }
@@ -384,13 +384,6 @@ updateStats();
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
 
 
 
