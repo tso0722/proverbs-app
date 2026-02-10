@@ -270,7 +270,7 @@ let selectedVerses = [];
 let proverbs = {};
 
 // API에서 json 불러오기
-fetch("/api/proverbs")
+fetch("proverbs.json")
   .then(res => res.json())
   .then(data => {
     proverbs = data;
@@ -384,6 +384,7 @@ updateStats();
 </script>
 </body>
 </html>
+
 
 
 
