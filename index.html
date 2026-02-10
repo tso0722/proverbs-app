@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>말씀 기록 앱</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #fafafa;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen {
+  display: none;
+  flex: 1;
+  padding: 15px;
+  overflow-y: auto;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.screen.active {
+  display: flex;
+}
+
+h2 {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 15px;
+  background: #f2f2f2;
+}
+
+button:active {
+  background: #ffe08c;
+}
+
+.nav {
+  display: flex;
+  border-top: 1px solid #ddd;
+}
+
+.nav button {
+  flex: 1;
+  padding: 12px;
+  font-size: 18px;
+}
+
+/* ===== 화면 1 ===== */
+.member-list {
+  list-style: none;
+  padding: 0;
+}
+
+.member-list li {
+  padding: 10px;
+  background: white;
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+
+.member-btns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+/* ===== 화면 2 ===== */
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+#verseList {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+.verse {
+  padding: 10px;
+  background: white;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+
+.verse.selected {
+  background: #ffe08c;
+}
+
+/* ===== 화면 3 ===== */
+textarea {
+  width: 100%;
+  height: calc(100vh - 200px);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 15px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- 👤 화면 1 -->
+<div id="members" class="screen active">
+  <h2>참여 인원</h2>
+  <ul id="memberList" class="member-list"></ul>
+
+  <div class="member-btns" style="margin-top:auto;flex-shrink:0">
+    <button onclick="addMember()">➕ 추가</button>
+    <button onclick="editMember()">✏️ 수정</button>
+    <button onclick="moveUp()">⬆</button>
+    <button onclick="deleteMember()">❌ 삭제</button>
+    <button onclick="saveMembers()">💾 저장</button>
+    <button onclick="moveDown()">⬇</button>
+
+  </div>
+</div>
+<!-- 📖 화면 2 -->
+<div id="verses" class="screen">
+  
+  <div class="top">
+    <span id="todayDate" style="margin-right:10px; font-weight:bold;"></span>
+    <button 
+    onclick="prevChapter()" 
+    style="font-size:18px; padding:10px 15px; height:50px; width:50px;">
+    ⬅
+</button>
+    <input id="chapterInput" value="1" style="width:50px;text-align:center">
+    <span>장</span>
+    <button 
+    onclick="nextChapter()" 
+    style="font-size:18px; padding:10px 15px; height:50px; width:50px;">
+    ➡
+</button>
+
+  </div>
+
+  <h2 id="chapterTitle"></h2>
+  <div id="verseList"></div>
+
+  <button style="width:100%;margin-top:10px;flex-shrink:0" onclick="copyVerses()">📋 복사</button>
+</div>
+
+<!-- 스크립트: 오늘 날짜 -->
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0'); // 0~11이므로 +1
+    const day = String(today.getDate()).padStart(2, '0');
+
+    // yyyy-mm-dd 형식으로 표시
+    document.getElementById("todayDate").textContent = `${year}-${month}-${day}`;
+
+    // chapter를 오늘 날짜 기준으로 초기화 (예: 일(day) 기준)
+    const chapterInput = document.getElementById("chapterInput");
+    chapterInput.value = day;
+    chapter = Number(day); // JS 변수 chapter와 동기화
+    loadVerses();
+  });
+</script>
+
+<!-- 📝 화면 3 -->
+<div id="stats" class="screen">
+  <h2>기록</h2>
+  <textarea id="statsText"></textarea>
+
+  <div style="display:flex;gap:8px;margin-top:8px">
+    <button onclick="copyAll()" style="flex: 1;">📄 전체 복사</button>
+    <button onclick="pasteText()" style="flex: 1;">📋 붙여넣기</button>
+    <button onclick="undoText()" style="flex: 1;">↩️ 실행취소</button>
+    <button onclick="shareText()" style="flex: 1;">🔗공유하기</button>
+  </div>
+</div>
+
+<!-- 하단 탭 -->
+<div class="nav">
+  <button onclick="show('members')">👤</button>
+  <button onclick="show('verses')">📖</button>
+  <button onclick="show('stats')">📝</button>
+</div>
+
+<script>
+/* ===== 공통 ===== */
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/* ===== 데이터 ===== */
+let members = JSON.parse(localStorage.getItem("members")) || [];
+let selectedIndex = null;
+
+
+/* ===== 화면 1 ===== */
+function renderMembers() {
+  const ul = document.getElementById("memberList");
+  ul.innerHTML = "";
+  members.forEach((m,i)=>{
+    const li = document.createElement("li");
+    li.textContent = m;
+    li.onclick = ()=> selectedIndex=i;
+    ul.appendChild(li);
+  });
+}
+renderMembers();
+
+function addMember() {
+  const n = prompt("이름 입력");
+  if(n) members.push(n);
+  renderMembers();
+}
+
+function editMember() {
+  if(selectedIndex==null) return;
+  const n = prompt("새 이름", members[selectedIndex]);
+  if(n) members[selectedIndex]=n;
+  renderMembers();
+}
+
+function deleteMember() {
+  if(selectedIndex==null) return;
+  members.splice(selectedIndex,1);
+  selectedIndex=null;
+  renderMembers();
+}
+
+function moveUp() {
+  if(selectedIndex>0){
+    [members[selectedIndex-1],members[selectedIndex]]=[members[selectedIndex],members[selectedIndex-1]];
+    selectedIndex--;
+    renderMembers();
+  }
+}
+
+function moveDown() {
+  if(selectedIndex < members.length-1){
+    [members[selectedIndex+1],members[selectedIndex]]=[members[selectedIndex],members[selectedIndex+1]];
+    selectedIndex++;
+    renderMembers();
+  }
+}
+
+function saveMembers() {
+  localStorage.setItem("members",JSON.stringify(members));
+  alert("저장 완료");
+  updateStats();
+}
+
+/* ===== 화면 2 ===== */
+const today = new Date();
+let chapter = today.getDate(); // 오늘 날짜(day)를 장(chapter)으로 사용
+let selectedVerses = [];
+let proverbs = {};
+
+// API에서 json 불러오기
+fetch("/api/proverbs")
+  .then(res => res.json())
+  .then(data => {
+    proverbs = data;
+    loadVerses();
+  })
+  .catch(err => console.error("json 로드 실패:", err));
+
+function loadVerses() {
+  const list = document.getElementById("verseList");
+  list.innerHTML="";
+  document.getElementById("chapterTitle").textContent=`잠언 ${chapter}장`;
+  document.getElementById("chapterInput").value=chapter;
+
+  if(!proverbs[chapter]) return;
+  
+  for(let v in proverbs[chapter]){
+    const d=document.createElement("div");
+    d.className="verse";
+    d.textContent=`${v}절${proverbs[chapter][v]}`;
+    d.onclick=()=>{
+      d.classList.toggle("selected");
+      const key = `${chapter}:${v}`;
+      if(selectedVerses.includes(key)) {
+        selectedVerses = selectedVerses.filter(item => item !== key);
+      } else {
+        selectedVerses.push(key);
+      }
+    }
+    list.appendChild(d);
+  }
+}
+
+function prevChapter(){ if(chapter>1){chapter--;loadVerses();}}
+function nextChapter(){ if(chapter<31){chapter++;loadVerses();}}
+
+function copyVerses(){
+  if(!selectedVerses.length) return showToast("선택 없음");
+  
+  let result = [];
+  selectedVerses.sort((a, b) => {
+    const [ch1, v1] = a.split(":").map(Number);
+    const [ch2, v2] = b.split(":").map(Number);
+    if(ch1 !== ch2) return ch1 - ch2;
+    return v1 - v2;
+  }).forEach(key => {
+    const [ch, v] = key.split(":");
+    result.push(`${ch}:${v} ${proverbs[ch][v]}`);
+  });
+  
+  navigator.clipboard.writeText(result.join("\n"));
+}
+
+
+
+/* ===== 화면 3 ===== */
+let undoStack=[];
+const stats=document.getElementById("statsText");
+
+function updateStats(){
+  stats.value = members.join("\n\n\n");
+  saveUndo();
+}
+
+function saveUndo(){
+  undoStack.push(stats.value);
+}
+
+stats.addEventListener("input",saveUndo);
+
+function undoText(){
+  if(undoStack.length>1){
+    undoStack.pop();
+    stats.value=undoStack[undoStack.length-1];
+  }
+}
+
+async function pasteText() {
+  const text = await navigator.clipboard.readText();
+  const textarea = document.getElementById("statsText");
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+
+  // 모든 줄바꿈 제거
+  const cleanText = text.replace(/[\r\n]+/g, " ").trim(); // \r\n, \n 모두 처리
+  const before = textarea.value.substring(0, start);
+  const after = textarea.value.substring(end).replace(/^\s+/, ""); // 붙여넣기 후 앞 공백 제거
+  textarea.value = before + "잠" + cleanText.trimStart() + after;
+
+  // 선택 후 커서 위치
+  textarea.selectionStart = textarea.selectionEnd = start + cleanText.length;
+
+  saveUndo();
+}
+
+function shareText() {
+  if (navigator.share) {
+    navigator.share({
+      title: '말씀 기록',
+      text: stats.value,
+    }).catch(err => console.error("공유 실패:", err));
+  } else {
+    alert("공유 기능이 지원되지 않는 환경입니다.");
+  }
+}
+
+function copyAll(){
+  navigator.clipboard.writeText(stats.value);
+}
+
+updateStats();
+</script>
+</body>
+</html>
